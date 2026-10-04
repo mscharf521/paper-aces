@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Paper Aces</title>
+<meta name="description" content="A two-pilot WWI dogfight played one page at a time. Both pilots pick a maneuver in secret, then turn to the page that shows what they see.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil+Display:wght@600;800&family=Libre+Franklin:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a flight-booklet spread — the illustrated page on the left, the pilot's control card on the right; stacks to one column on phones. */
+:root {
+  --linen: #c8d2d4;      /* doped-linen grey-blue ground */
+  --sheet: #e4e9e8;      /* card stock */
+  --ink: #1b2830;        /* printer's ink */
+  --ink-soft: #4b5c64;
+  --rule: #9aa9ad;
+  --roundel: #b3342b;    /* accent: marking red */
+  --olive: #56653a;      /* secondary: field olive */
+  --blue: #2c5a86;
+  --f-display: "Big Shoulders Stencil Display", "Impact", "Arial Narrow", sans-serif;
+  --f-body: "Libre Franklin", "Helvetica Neue", Arial, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--linen); color: var(--ink);
+  font: 15px/1.5 var(--f-body);
+  background-image: repeating-linear-gradient(0deg, rgba(27,40,48,.035) 0 1px, transparent 1px 3px),
+                    repeating-linear-gradient(90deg, rgba(27,40,48,.03) 0 1px, transparent 1px 4px);
+}
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 16px; padding-block: 18px 40px; }
+header.mast { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; border-bottom: 2px solid var(--ink); padding-bottom: 8px; margin-bottom: 18px; }
+.mast h1 { font: 800 clamp(40px, 7vw, 68px)/0.9 var(--f-display); letter-spacing: .02em; margin: 0; text-transform: uppercase; }
+.mast h1 span { color: var(--roundel); }
+.mast .sub { font: 500 12px/1.4 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, .man:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+
+/* Start screen */
+.start { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+.start .intro p { max-width: 62ch; margin: 0 0 12px; }
+.start h2 { font: 800 30px/1 var(--f-display); text-transform: uppercase; margin: 0 0 12px; letter-spacing: .03em; }
+.modes { display: grid; gap: 12px; }
+.mode { text-align: left; background: var(--sheet); border: 2px solid var(--ink); padding: 14px 16px; display: grid; gap: 4px; box-shadow: 4px 4px 0 var(--ink); transition: transform .08s, box-shadow .08s; }
+.mode:hover { transform: translate(-1px,-1px); box-shadow: 5px 5px 0 var(--ink); }
+.mode:active { transform: translate(3px,3px); box-shadow: 1px 1px 0 var(--ink); }
+.mode b { font: 800 24px/1 var(--f-display); text-transform: uppercase; letter-spacing: .03em; }
+.mode small { color: var(--ink-soft); }
+.rules { background: var(--sheet); border: 1px solid var(--rule); padding: 14px 18px; margin-top: 16px; }
+.rules h3 { font: 600 12px/1 var(--f-mono); letter-spacing: .1em; text-transform: uppercase; margin: 0 0 8px; color: var(--roundel); }
+.rules ol { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+
+/* Game */
+.game { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(300px, 1fr); gap: 22px; align-items: start; }
+.page { background: var(--sheet); border: 2px solid var(--ink); padding: 12px; position: relative; }
+.page-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+.page-head .who { font: 600 12px/1.2 var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); }
+.page-head .pno { font: 800 34px/1 var(--f-display); letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+.page-head .pno small { font: 600 12px/1 var(--f-mono); color: var(--ink-soft); margin-right: 6px; letter-spacing: .1em; }
+canvas#view { width: 100%; height: auto; aspect-ratio: 16 / 10; display: block; background: #8fa9b8; border: 1px solid var(--ink); max-width: 100%; }
+.caption { margin: 10px 2px 0; font-size: 15px; min-height: 3em; }
+.caption .tag { display: inline-block; font: 600 11px/1 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; padding: 4px 6px; margin-right: 6px; border: 1.5px solid currentColor; vertical-align: 1px; }
+.tag.sights { color: var(--roundel); }
+.tag.danger { color: #fff; background: var(--roundel); border-color: var(--roundel); }
+.tag.calm { color: var(--olive); }
+
+.panel { display: grid; gap: 14px; min-width: 0; }
+.card { background: var(--sheet); border: 1px solid var(--rule); padding: 12px 14px; min-width: 0; }
+.card h3 { font: 600 11px/1 var(--f-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 10px; display: flex; justify-content: space-between; }
+.pilots { display: grid; gap: 10px; }
+.pilot { display: grid; grid-template-columns: 74px 1fr auto; gap: 10px; align-items: center; }
+.pilot .nm { font: 800 20px/1 var(--f-display); text-transform: uppercase; letter-spacing: .03em; }
+.pilot.p1 .nm { color: var(--blue); }
+.pilot.p2 .nm { color: var(--roundel); }
+.hp { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; }
+.hp i { height: 14px; border: 1.5px solid var(--ink); background: var(--ink); }
+.hp i.lost { background: transparent; background-image: repeating-linear-gradient(45deg, var(--rule) 0 2px, transparent 2px 5px); }
+.pilot .alt { font: 500 12px/1 var(--f-mono); color: var(--ink-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.mans { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.man { background: var(--linen); border: 1.5px solid var(--ink); padding: 6px 2px 5px; display: grid; justify-items: center; gap: 2px; min-width: 0; position: relative; }
+.man svg { width: 38px; height: 38px; }
+.man span { font: 600 10.5px/1.1 var(--f-mono); text-transform: uppercase; letter-spacing: .02em; text-align: center; }
+.man:hover:not(:disabled) { background: #fff; }
+.man.sel { background: var(--ink); color: var(--sheet); }
+.man.sel svg * { stroke: var(--sheet); }
+.man:disabled { opacity: .35; cursor: not-allowed; background-image: repeating-linear-gradient(-45deg, transparent 0 4px, rgba(27,40,48,.15) 4px 5px); }
+.mans-note { font-size: 13px; color: var(--ink-soft); margin: 8px 0 0; min-height: 2.6em; }
+.go { width: 100%; margin-top: 10px; padding: 12px; background: var(--roundel); color: #fff; border: 2px solid var(--ink); font: 800 22px/1 var(--f-display); text-transform: uppercase; letter-spacing: .06em; box-shadow: 3px 3px 0 var(--ink); }
+.go:disabled { background: var(--rule); color: var(--ink-soft); box-shadow: none; cursor: not-allowed; }
+.go:not(:disabled):active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
+
+.log { max-height: 190px; overflow-y: auto; font: 13px/1.45 var(--f-body); display: grid; gap: 6px; }
+.log p { margin: 0; padding-left: 10px; border-left: 3px solid var(--rule); }
+.log p.hit { border-color: var(--roundel); }
+.log p b { font: 600 11px/1 var(--f-mono); color: var(--ink-soft); margin-right: 4px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.ghost { background: transparent; border: 1.5px solid var(--ink); padding: 6px 10px; font: 600 11px/1 var(--f-mono); text-transform: uppercase; letter-spacing: .08em; }
+.ghost[aria-pressed="true"] { background: var(--ink); color: var(--sheet); }
+canvas#chart { width: 100%; height: auto; aspect-ratio: 1; display: block; margin-top: 10px; border: 1px solid var(--rule); max-width: 100%; }
+
+/* Curtain for pass-and-play, and end screen */
+.curtain { position: fixed; inset: 0; background: rgba(27,40,48,.92); display: grid; place-items: center; z-index: 10; padding: 16px; }
+.curtain .box { background: var(--sheet); border: 2px solid var(--ink); padding: 26px 28px; max-width: 460px; width: 100%; text-align: center; box-shadow: 6px 6px 0 #000; }
+.curtain h2 { font: 800 40px/1 var(--f-display); text-transform: uppercase; margin: 0 0 10px; letter-spacing: .03em; }
+.curtain p { margin: 0 0 18px; }
+.curtain .go { width: auto; padding: 12px 26px; }
+
+.mode.online { box-shadow: 4px 4px 0 var(--blue); border-color: var(--blue); }
+.mode.online:hover { transform: none; box-shadow: 4px 4px 0 var(--blue); }
+.online-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch; margin-top: 8px; }
+.go.small { width: auto; margin: 0; padding: 10px 16px; font-size: 19px; }
+.joinform { display: flex; gap: 6px; flex: 1 1 180px; min-width: 0; }
+.joinform input { flex: 1 1 auto; min-width: 0; width: 6em; font: 800 24px/1 var(--f-display); letter-spacing: .25em; text-transform: uppercase; padding: 6px 10px; border: 2px solid var(--ink); background: #fff; color: var(--ink); }
+.joinform input:focus-visible { outline: 3px solid var(--blue); outline-offset: 1px; }
+.joinform .ghost { padding: 6px 14px; }
+#rejoin { justify-self: start; margin-top: 8px; }
+.onlinemsg { margin: 6px 0 0; font-size: 13px; color: var(--roundel); min-height: 1.2em; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.code { font: 800 16px/1 var(--f-display); letter-spacing: .15em; color: var(--ink); }
+.bigcode { font: 800 72px/1 var(--f-display); letter-spacing: .2em; margin: 4px 0 12px; color: var(--blue); }
+.share { font-size: 13px; color: var(--ink-soft); }
+.share .link { font: 12px/1.4 var(--f-mono); word-break: break-all; color: var(--ink); }
+#ct-extra .ghost { margin-bottom: 14px; }
+.waiting { font: 600 12px/1 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); animation: blink 1.6s ease-in-out infinite; }
+@keyframes blink { 50% { opacity: .35; } }
+@media (max-width: 860px) {
+  .game, .start { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 420px) {
+  .man span { font-size: 9px; }
+  .man svg { width: 30px; height: 30px; }
+  .pilot { grid-template-columns: 60px 1fr auto; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="mast">
+    <h1>Paper <span>Aces</span></h1>
+    <div class="sub">Two pilots · one sky · turn to the page</div>
+  </header>
+
+  <!-- START -->
+  <section class="start" id="start">
+    <div class="intro">
+      <h2>How a turn works</h2>
+      <p>Each pilot sees only their own page: the view from the cockpit, with the enemy wherever your last move left him. Both of you choose a maneuver in secret. When the choices are in, both aircraft move at once and you turn to a new page.</p>
+      <p>Line the enemy up in your ring sight, close enough and at the same height, and your guns hit. Eight hits and he goes down. Read his wings: a tilted aircraft is turning, a tail means he is running, and a full silhouette coming at you means he is about to fire too.</p>
+      <div class="rules">
+        <h3>Rules of the air</h3>
+        <ol>
+          <li>Hits land when the enemy sits within about 15° of your nose, under 180&nbsp;m away, and within one altitude band.</li>
+          <li>Point-blank (under 70&nbsp;m, inside 22°) is a double hit.</li>
+          <li>Some maneuvers lock out others next turn: no tight turn straight out of a dive, no Immelmann from a slow crawl, and so on. Locked cards are struck through.</li>
+          <li>If the aircraft drift more than 400&nbsp;m apart, both pilots wheel around and re-engage head-on.</li>
+          <li>Pass too close and you both take a hit from the collision.</li>
+        </ol>
+      </div>
+    </div>
+    <div>
+      <h2>Choose your sortie</h2>
+      <div class="modes">
+        <button class="mode" data-mode="ai" data-level="1" id="mode-ai-rookie"><b>Versus a rookie</b><small>The enemy flies by instinct and makes mistakes.</small></button>
+        <button class="mode" data-mode="ai" data-level="2" id="mode-ai-ace"><b>Versus an ace</b><small>The enemy reads every possible move before choosing.</small></button>
+        <button class="mode" data-mode="hot" id="mode-hot"><b>Two pilots, one screen</b><small>Pass the device between turns. Each pilot picks in private.</small></button>
+        <div class="mode online">
+          <b>Fly online</b>
+          <small>Play someone on another device. The host gets a four-letter code to share.</small>
+          <div class="online-row">
+            <button class="go small" id="host" type="button">Host a game</button>
+            <form id="joinform" class="joinform">
+              <label for="joincode" class="sr">Game code</label>
+              <input id="joincode" name="joincode" maxlength="4" placeholder="CODE" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text">
+              <button class="ghost" type="submit" id="joinbtn">Join</button>
+            </form>
+          </div>
+          <button class="ghost" id="rejoin" type="button" hidden>Rejoin game</button>
+          <p class="onlinemsg" id="onlinemsg" role="status"></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- GAME -->
+  <section class="game" id="game" hidden>
+    <div class="page">
+      <div class="page-head">
+        <div class="who" id="who">Pilot 1 · forward view</div>
+        <div class="pno"><small>Page</small><span id="pno">001</span></div>
+      </div>
+      <canvas id="view" width="960" height="600" aria-label="Cockpit view"></canvas>
+      <p class="caption" id="caption"></p>
+    </div>
+
+    <div class="panel">
+      <div class="card">
+        <h3><span>Damage</span><span id="turnno">Turn 1</span></h3>
+        <div class="pilots">
+          <div class="pilot p1"><div class="nm" id="nm1">Blue</div><div class="hp" id="hp1"></div><div class="alt" id="alt1"></div></div>
+          <div class="pilot p2"><div class="nm" id="nm2">Red</div><div class="hp" id="hp2"></div><div class="alt" id="alt2"></div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3><span id="pickhead">Your maneuver</span><span id="pickwho"></span></h3>
+        <div class="mans" id="mans"></div>
+        <p class="mans-note" id="note">Pick a maneuver. Struck-through cards are locked by your last move.</p>
+        <button class="go" id="go" disabled>Fly it</button>
+      </div>
+
+      <div class="card">
+        <h3><span>Flight log</span><span class="row"><button class="ghost" id="chartbtn" aria-pressed="false">Map</button><button class="ghost" id="quit">New sortie</button></span></h3>
+        <div class="log" id="log"></div>
+        <canvas id="chart" width="440" height="440" hidden aria-label="Overhead map"></canvas>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="curtain" id="curtain" hidden>
+  <div class="box">
+    <h2 id="ct-title">Pass the controls</h2>
+    <p id="ct-text"></p>
+    <div id="ct-extra"></div>
+    <button class="go" id="ct-btn">I'm ready</button>
+  </div>
+</div>
+
+<script src="rules.js"></script>
+<script>
+(() => {
+"use strict";
+const P = window.PaperRules;
+const { MAX_HP, UNIT_M, DEG, MAN, ORDER, lockReason, vec, wrap180, relative, hitsOn, pageNumber, clockOf } = P;
+const rng = seed => { let s = seed >>> 0 || 1; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; };
+
+// ---------- Rendering: the cockpit page ----------
+const cv = document.getElementById("view"), cx = cv.getContext("2d");
+const W = cv.width, H = cv.height, FOC = W * 0.55, CY = H * 0.47;
+const CLOUDS = (() => { const r = rng(1917), out = []; for (let i = 0; i < 26; i++) out.push({ az: r() * 360, el: 2 + r() * 14, w: 30 + r() * 90, n: 3 + Math.floor(r() * 4), s: r() * 1000 }); return out; })();
+const COL = {
+  blue: { wing: "#b9a777", wingDark: "#8e7f55", body: "#7f7350", mark: "roundel" },
+  red:  { wing: "#9c2e26", wingDark: "#6e1f1a", body: "#5a1a16", mark: "cross" },
+};
+
+// model (x right, y up, z forward), units ~ grid units
+function planeModel() {
+  const P = [];
+  const quad = (pts, fill, kind) => P.push({ pts, fill, kind });
+  const sp = 0.16;
+  quad([[-sp,0.035,0.03],[sp,0.035,0.03],[sp,0.035,-0.015],[-sp,0.035,-0.015]], "wing", "upper");
+  quad([[-sp*0.92,-0.02,0.02],[sp*0.92,-0.02,0.02],[sp*0.92,-0.02,-0.02],[-sp*0.92,-0.02,-0.02]], "wingDark", "lower");
+  quad([[-0.022,0.02,0.09],[0.022,0.02,0.09],[0.008,0.012,-0.12],[-0.008,0.012,-0.12]], "body", "top");
+  quad([[0,0.022,0.09],[0,-0.026,0.09],[0,-0.004,-0.12],[0,0.014,-0.12]], "body", "side");
+  quad([[-0.05,0.008,-0.095],[0.05,0.008,-0.095],[0.045,0.008,-0.125],[-0.045,0.008,-0.125]], "wing", "tailplane");
+  quad([[0,0.012,-0.09],[0,0.06,-0.112],[0,0.058,-0.128],[0,0.012,-0.124]], "wingDark", "fin");
+  // struts
+  for (const x of [-0.1, 0.1]) quad([[x,0.035,0.008],[x+0.002,0.035,0.008],[x+0.002,-0.02,0.0],[x,-0.02,0.0]], "strut", "strut");
+  return P;
+}
+const MODEL = planeModel();
+
+function project(X, Y, Z, roll) {
+  if (Z < 0.08) return null;
+  let sx = X / Z * FOC, sy = -Y / Z * FOC;
+  const c = Math.cos(roll), s = Math.sin(roll);
+  return [W / 2 + sx * c - sy * s, CY + sx * s + sy * c];
+}
+
+function drawSky(camHeadingDeg, roll, alt, camX, camY) {
+  // rotate whole world layer by roll around (W/2, CY)
+  cx.save();
+  cx.translate(W / 2, CY); cx.rotate(roll); cx.translate(-W / 2, -CY);
+  const g = cx.createLinearGradient(0, -H, 0, CY);
+  g.addColorStop(0, "#5f86a6"); g.addColorStop(0.7, "#a9c1cd"); g.addColorStop(1, "#dfe4dc");
+  cx.fillStyle = g; cx.fillRect(-W, -H, W * 3, CY + H);
+  const gg = cx.createLinearGradient(0, CY, 0, H * 2);
+  gg.addColorStop(0, "#b9b99a"); gg.addColorStop(0.08, "#8d9566"); gg.addColorStop(1, "#4f5a33");
+  cx.fillStyle = gg; cx.fillRect(-W, CY, W * 3, H * 2);
+  // ground field lines in world space for parallax
+  const camH = 0.4 + alt * 0.35, a = camHeadingDeg * DEG, f = vec(a), r = vec(a + 90 * DEG);
+  cx.strokeStyle = "rgba(60,70,40,.35)"; cx.lineWidth = 1;
+  const S = 2.5, R = 34;
+  const gx0 = Math.floor((camX - R) / S) * S, gy0 = Math.floor((camY - R) / S) * S;
+  const toScreen = (wx, wy) => {
+    const dx = wx - camX, dy = wy - camY, Z = dx * f.x + dy * f.y, X = dx * r.x + dy * r.y;
+    if (Z < 0.3) return null; return [W / 2 + X / Z * FOC, CY + camH / Z * FOC];
+  };
+  cx.beginPath();
+  for (let gx = gx0; gx <= camX + R; gx += S) for (let gy = gy0; gy <= camY + R; gy += S) {
+    const p = toScreen(gx, gy), q = toScreen(gx + S, gy), w = toScreen(gx, gy + S);
+    if (p && q) { cx.moveTo(p[0], p[1]); cx.lineTo(q[0], q[1]); }
+    if (p && w) { cx.moveTo(p[0], p[1]); cx.lineTo(w[0], w[1]); }
+  }
+  cx.stroke();
+  // haze over horizon
+  const hz = cx.createLinearGradient(0, CY - 30, 0, CY + 40);
+  hz.addColorStop(0, "rgba(223,228,220,0)"); hz.addColorStop(0.45, "rgba(223,228,220,.85)"); hz.addColorStop(1, "rgba(223,228,220,0)");
+  cx.fillStyle = hz; cx.fillRect(-W, CY - 30, W * 3, 70);
+  // clouds at fixed world azimuths
+  for (const c of CLOUDS) {
+    const d = wrap180(c.az - camHeadingDeg); if (Math.abs(d) > 75) continue;
+    const x = W / 2 + Math.tan(d * DEG) * FOC, y = CY - Math.tan((c.el - alt * 1.2) * DEG) * FOC;
+    const r2 = rng(c.s * 1000);
+    cx.fillStyle = "rgba(245,246,240,.85)";
+    for (let i = 0; i < c.n; i++) { cx.beginPath(); cx.ellipse(x + (r2() - .5) * c.w * 1.4, y + (r2() - .5) * c.w * .25, c.w * (.35 + r2() * .35), c.w * (.15 + r2() * .12), 0, 0, Math.PI * 2); cx.fill(); }
+  }
+  cx.restore();
+}
+
+function drawEnemy(rel, rear, en, roll, damaged) {
+  const X = rear ? -rel.rt : rel.rt, Z = rear ? -rel.fw : rel.fw;
+  const Y = rel.dAlt * 0.12;
+  const yaw = (rel.yaw + (rear ? 180 : 0)) * DEG;
+  const F = [Math.sin(yaw), 0, Math.cos(yaw)], R = [Math.cos(yaw), 0, -Math.sin(yaw)], U = [0, 1, 0];
+  const er = (en.roll || 0) * DEG, ec = Math.cos(er), es = Math.sin(er);
+  const tf = ([mx, my, mz]) => {
+    const x = mx * ec + my * es, y = -mx * es + my * ec;
+    return [X + x * R[0] + y * U[0] + mz * F[0], Y + x * R[1] + y * U[1] + mz * F[1], Z + x * R[2] + y * U[2] + mz * F[2]];
+  };
+  const col = COL[en.side];
+  const polys = [];
+  for (const q of MODEL) {
+    const w = q.pts.map(tf); const scr = w.map(p => project(p[0], p[1], p[2], roll));
+    if (scr.some(s => !s)) continue;
+    polys.push({ scr, z: w.reduce((s, p) => s + p[2], 0) / w.length, fill: q.fill === "strut" ? "#2a2520" : col[q.fill], kind: q.kind, w });
+  }
+  // propeller disc + insignia as projected circles
+  const circ = (cxm, cym, czm, rad, plane) => {
+    const pts = []; for (let i = 0; i < 14; i++) { const t = i / 14 * Math.PI * 2; const a = Math.cos(t) * rad, b = Math.sin(t) * rad;
+      pts.push(plane === "xy" ? [cxm + a, cym + b, czm] : [cxm + a, cym, czm + b]); }
+    const w = pts.map(tf); const scr = w.map(p => project(p[0], p[1], p[2], roll));
+    return scr.some(s => !s) ? null : { scr, z: w.reduce((s, p) => s + p[2], 0) / w.length };
+  };
+  const prop = circ(0, 0, 0.095, 0.045, "xy"); if (prop) polys.push({ ...prop, fill: "rgba(40,36,30,.28)", kind: "prop" });
+  for (const sx of [-0.115, 0.115]) {
+    if (col.mark === "roundel") {
+      for (const [rad, f] of [[0.022, "#2c5a86"], [0.015, "#f1efe6"], [0.008, "#b3342b"]]) { const c = circ(sx, 0.037, 0.008, rad, "xz"); if (c) polys.push({ ...c, z: c.z - 0.001, fill: f, kind: "mark" }); }
+    } else {
+      const c = circ(sx, 0.037, 0.008, 0.02, "xz"); if (c) polys.push({ ...c, z: c.z - 0.001, fill: "#f1efe6", kind: "mark" });
+      const arm = (x0, z0, x1, z1) => { const w = [[sx + x0, 0.038, 0.008 + z0], [sx + x1, 0.038, 0.008 + z0], [sx + x1, 0.038, 0.008 + z1], [sx + x0, 0.038, 0.008 + z1]].map(tf); const s = w.map(p => project(p[0], p[1], p[2], roll)); if (!s.some(v => !v)) polys.push({ scr: s, z: c ? c.z - 0.002 : 0, fill: "#151515", kind: "mark" }); };
+      arm(-0.016, -0.004, 0.016, 0.004); arm(-0.004, -0.016, 0.004, 0.016);
+    }
+  }
+  polys.sort((a, b) => b.z - a.z);
+  cx.lineJoin = "round";
+  for (const p of polys) {
+    cx.beginPath(); p.scr.forEach((s, i) => i ? cx.lineTo(s[0], s[1]) : cx.moveTo(s[0], s[1])); cx.closePath();
+    cx.fillStyle = p.fill; cx.fill();
+    if (p.kind !== "prop" && p.kind !== "mark") { cx.strokeStyle = "rgba(20,18,15,.7)"; cx.lineWidth = Math.max(0.6, 50 / Math.max(Z, 0.5) / 40); cx.stroke(); }
+  }
+  const c = project(X, Y, Z, roll);
+  if (c && damaged) { // smoke trail
+    const n = damaged > 0.7 ? 9 : 5;
+    for (let i = 0; i < n; i++) { cx.fillStyle = `rgba(${damaged > 0.99 ? 40 : 70},${damaged > 0.99 ? 35 : 70},${damaged > 0.99 ? 30 : 70},${0.35 - i * 0.03})`;
+      const back = project(X - F[0] * 0.12 * i, Y + 0.01 * i, Z - F[2] * 0.12 * i, roll); if (!back) continue;
+      cx.beginPath(); cx.arc(back[0], back[1], (8 + i * 5) * FOC / 500 / Math.max(Z, 0.4), 0, Math.PI * 2); cx.fill(); }
+    if (damaged > 0.99) { cx.fillStyle = "rgba(240,140,40,.85)"; cx.beginPath(); cx.arc(c[0], c[1], 14 / Math.max(Z, 0.4), 0, Math.PI * 2); cx.fill(); }
+  }
+  return c;
+}
+
+function drawForwardCockpit(col, alt, spd, hpFrac) {
+  // upper wing trailing edge
+  cx.fillStyle = col.wing; cx.fillRect(0, 0, W, 62);
+  cx.fillStyle = col.wingDark; cx.fillRect(0, 54, W, 8);
+  for (let i = 0; i < W; i += 46) { cx.fillStyle = "rgba(0,0,0,.12)"; cx.fillRect(i, 0, 2, 54); } // ribs
+  cx.fillStyle = "#c9c4b0"; cx.beginPath(); cx.ellipse(W / 2, 56, 70, 22, 0, 0, Math.PI); cx.fill(); // cutout
+  cx.fillStyle = "#94acb9"; cx.beginPath(); cx.ellipse(W / 2, 56, 62, 18, 0, 0, Math.PI); cx.fill();
+  // cabane struts
+  cx.strokeStyle = "#2a2520"; cx.lineWidth = 9;
+  cx.beginPath(); cx.moveTo(W * 0.40, 60); cx.lineTo(W * 0.43, H * 0.70); cx.moveTo(W * 0.60, 60); cx.lineTo(W * 0.57, H * 0.70); cx.stroke();
+  // interplane struts at sides
+  cx.lineWidth = 14; cx.beginPath(); cx.moveTo(40, 60); cx.lineTo(70, H); cx.moveTo(W - 40, 60); cx.lineTo(W - 70, H); cx.stroke();
+  cx.lineWidth = 2; cx.strokeStyle = "rgba(30,28,25,.8)";
+  cx.beginPath(); cx.moveTo(45, 62); cx.lineTo(W * 0.43, H * 0.70); cx.moveTo(W - 45, 62); cx.lineTo(W * 0.57, H * 0.70); cx.stroke(); // flying wires
+  // cowling + dash
+  cx.fillStyle = col.body; cx.beginPath(); cx.moveTo(0, H); cx.lineTo(0, H * 0.86); cx.quadraticCurveTo(W / 2, H * 0.62, W, H * 0.86); cx.lineTo(W, H); cx.fill();
+  cx.fillStyle = "#3b2c1e"; cx.beginPath(); cx.moveTo(W * 0.12, H); cx.lineTo(W * 0.16, H * 0.86); cx.quadraticCurveTo(W / 2, H * 0.73, W * 0.84, H * 0.86); cx.lineTo(W * 0.88, H); cx.fill();
+  // guns
+  for (const gx of [W * 0.465, W * 0.535]) {
+    cx.fillStyle = "#1c1c1a"; cx.beginPath(); cx.moveTo(gx - 16, H); cx.lineTo(gx - 7, H * 0.70); cx.lineTo(gx + 7, H * 0.70); cx.lineTo(gx + 16, H); cx.fill();
+    cx.fillStyle = "#3a3a36"; for (let k = 0; k < 6; k++) cx.fillRect(gx - 9 + k * 0.4, H * 0.72 + k * 14, 18 - k * 0.8, 3);
+  }
+  // gauges
+  const gauge = (x, y, v, label) => {
+    cx.fillStyle = "#e8e4d6"; cx.beginPath(); cx.arc(x, y, 30, 0, Math.PI * 2); cx.fill();
+    cx.strokeStyle = "#111"; cx.lineWidth = 3; cx.stroke();
+    cx.lineWidth = 1.5; for (let i = 0; i <= 8; i++) { const a = (-225 + i * 33.75) * DEG; cx.beginPath(); cx.moveTo(x + Math.cos(a) * 24, y + Math.sin(a) * 24); cx.lineTo(x + Math.cos(a) * 28, y + Math.sin(a) * 28); cx.stroke(); }
+    const a = (-225 + v * 270) * DEG; cx.strokeStyle = "#b3342b"; cx.lineWidth = 3; cx.beginPath(); cx.moveTo(x, y); cx.lineTo(x + Math.cos(a) * 22, y + Math.sin(a) * 22); cx.stroke();
+    cx.fillStyle = "#111"; cx.font = "600 9px 'IBM Plex Mono', monospace"; cx.textAlign = "center"; cx.fillText(label, x, y + 16);
+  };
+  gauge(W * 0.25, H * 0.92, alt / 6, "ALT"); gauge(W * 0.75, H * 0.92, spd / 3, "SPD"); gauge(W * 0.33, H * 0.95, hpFrac, "FUEL·OIL");
+  // ring sight
+  const sx = W / 2, sy = CY;
+  cx.strokeStyle = "rgba(20,20,18,.9)"; cx.lineWidth = 2.5;
+  cx.beginPath(); cx.arc(sx, sy, Math.tan(15 * DEG) * FOC, 0, Math.PI * 2); cx.stroke();
+  cx.lineWidth = 1.5; cx.beginPath(); cx.arc(sx, sy, Math.tan(7 * DEG) * FOC, 0, Math.PI * 2); cx.stroke();
+  cx.beginPath(); cx.moveTo(sx - Math.tan(15 * DEG) * FOC, sy); cx.lineTo(sx + Math.tan(15 * DEG) * FOC, sy); cx.moveTo(sx, sy - Math.tan(15 * DEG) * FOC); cx.lineTo(sx, sy + Math.tan(15 * DEG) * FOC); cx.stroke();
+  cx.lineWidth = 3; cx.beginPath(); cx.moveTo(sx, sy + Math.tan(15 * DEG) * FOC); cx.lineTo(sx, H * 0.72); cx.stroke();
+}
+
+function drawRearCockpit(col) {
+  // looking aft over the shoulder: fuselage decking runs down to the tail
+  cx.fillStyle = col.body;
+  cx.beginPath(); cx.moveTo(W * 0.18, H); cx.lineTo(W * 0.45, H * 0.60); cx.lineTo(W * 0.55, H * 0.60); cx.lineTo(W * 0.82, H); cx.fill();
+  cx.strokeStyle = "rgba(0,0,0,.25)"; cx.lineWidth = 2;
+  for (let i = 1; i < 6; i++) { const t = i / 6, y = H - (H * 0.4) * t, hw = W * (0.32 - 0.27 * t); cx.beginPath(); cx.moveTo(W / 2 - hw, y); cx.lineTo(W / 2 + hw, y); cx.stroke(); }
+  cx.fillStyle = col.wing; cx.beginPath(); cx.moveTo(W * 0.30, H * 0.62); cx.lineTo(W * 0.70, H * 0.62); cx.lineTo(W * 0.66, H * 0.66); cx.lineTo(W * 0.34, H * 0.66); cx.fill(); // tailplane
+  cx.fillStyle = col.wingDark; cx.beginPath(); cx.moveTo(W * 0.495, H * 0.62); cx.lineTo(W * 0.49, H * 0.47); cx.lineTo(W * 0.51, H * 0.45); cx.lineTo(W * 0.505, H * 0.62); cx.fill(); // fin edge-on
+  // headrest / cockpit coaming edge
+  cx.fillStyle = "#3b2c1e"; cx.beginPath(); cx.ellipse(W / 2, H + 30, W * 0.42, 120, 0, Math.PI, 0); cx.fill();
+  cx.fillStyle = "#6b4a2c"; cx.beginPath(); cx.ellipse(W / 2, H + 30, W * 0.42, 120, 0, Math.PI, 0); cx.lineWidth = 10; cx.strokeStyle = "#2a1d12"; cx.stroke();
+  cx.fillStyle = "rgba(27,40,48,.75)"; cx.font = "600 16px 'IBM Plex Mono', monospace"; cx.textAlign = "left"; cx.fillText("LOOKING AFT", 18, 30);
+}
+
+function drawPage(me, en, fx = {}) {
+  const rel = relative(me, en);
+  const rear = Math.abs(rel.bearing) > 100;
+  const camHead = me.h * 45 + (rear ? 180 : 0);
+  const roll = (rear ? 1 : -1) * (me.roll || 0) * DEG * 0.7;
+  cx.clearRect(0, 0, W, H);
+  drawSky(camHead, roll, me.alt, me.x, me.y);
+  const col = COL[me.side];
+  const dmg = 1 - Math.max(en.hp, 0) / MAX_HP;
+  const scr = drawEnemy(rel, rear, en, roll, dmg >= 0.5 ? (en.hp <= 0 ? 1 : dmg) : 0);
+  // tracers
+  if (fx.out && scr && !rear) {
+    cx.strokeStyle = "rgba(255,226,140,.95)"; cx.lineWidth = 2; cx.setLineDash([10, 14]);
+    for (const gx of [W * 0.465, W * 0.535]) { cx.beginPath(); cx.moveTo(gx, H * 0.70); cx.lineTo(scr[0] + (gx - W / 2) * 0.05, scr[1]); cx.stroke(); }
+    cx.setLineDash([]);
+    cx.fillStyle = "rgba(255,200,90,.9)"; for (const gx of [W * 0.465, W * 0.535]) { cx.beginPath(); cx.arc(gx, H * 0.70, 9, 0, Math.PI * 2); cx.fill(); }
+  }
+  if (rear) drawRearCockpit(col); else drawForwardCockpit(col, me.alt, me.spd || 2, Math.max(me.hp, 0) / MAX_HP);
+  // off-view indicator
+  const inView = scr && scr[0] > -20 && scr[0] < W + 20 && scr[1] > -20 && scr[1] < H + 20;
+  if (!inView && en.hp > 0) {
+    const ang = rear ? -wrap180(rel.bearing - 180) : rel.bearing;
+    const left = ang < 0, y = CY;
+    cx.fillStyle = "rgba(179,52,43,.92)";
+    const x = left ? 28 : W - 28;
+    cx.beginPath(); cx.moveTo(x + (left ? -14 : 14), y); cx.lineTo(x + (left ? 16 : -16), y - 20); cx.lineTo(x + (left ? 16 : -16), y + 20); cx.fill();
+    cx.font = "600 15px 'IBM Plex Mono', monospace"; cx.textAlign = left ? "left" : "right";
+    cx.fillStyle = "#1b2830"; cx.fillText(`${clockOf(rel.bearing)} o'clock`, left ? 52 : W - 52, y + 5);
+  }
+  // incoming hits: holes in the fabric
+  if (fx.inc) {
+    const r = rng(fx.seed || 7);
+    for (let i = 0; i < fx.inc * 4; i++) {
+      const x = r() * W, y = H * 0.5 + r() * H * 0.45;
+      cx.fillStyle = "#14110d"; cx.beginPath(); cx.arc(x, y, 4 + r() * 3, 0, Math.PI * 2); cx.fill();
+      cx.strokeStyle = "rgba(220,210,190,.7)"; cx.lineWidth = 1.5; cx.beginPath(); cx.arc(x, y, 8, 0, Math.PI * 2); cx.stroke();
+    }
+    const v = cx.createRadialGradient(W / 2, H / 2, H * 0.3, W / 2, H / 2, W * 0.7);
+    v.addColorStop(0, "rgba(179,52,43,0)"); v.addColorStop(1, "rgba(179,52,43,.45)"); cx.fillStyle = v; cx.fillRect(0, 0, W, H);
+  }
+  if (me.hp <= 0) { cx.fillStyle = "rgba(30,25,20,.55)"; cx.fillRect(0, 0, W, H); }
+  return { rel, rear, inView };
+}
+
+function describe(me, en, rel, rear) {
+  const m = Math.round(rel.dist * UNIT_M / 5) * 5;
+  const aspAbs = Math.abs(wrap180(rel.yaw - (180 + rel.bearing)));
+  // aspect relative to line of sight: 0 = coming straight at you, 180 = flying away
+  const asp = aspAbs < 30 ? "nose-on, coming at you" : aspAbs > 150 ? "tail toward you, running" : aspAbs < 75 ? "angling toward you" : aspAbs > 115 ? "angling away" : "crossing broadside";
+  const lvl = rel.dAlt > 0.5 ? "above you" : rel.dAlt < -0.5 ? "below you" : "level with you";
+  const pos = Math.abs(rel.bearing) < 8 ? "dead ahead" : rear && Math.abs(rel.bearing) > 170 ? "dead astern" : `at ${clockOf(rel.bearing)} o'clock`;
+  let tag = "";
+  if (en.hp <= 0) tag = `<span class="tag sights">Going down</span>`;
+  else if (hitsOn(me, en)) tag = `<span class="tag sights">In your sights</span>`;
+  else if (hitsOn(en, me)) tag = `<span class="tag danger">He has you lined up</span>`;
+  else if (rel.dist > 7) tag = `<span class="tag calm">Distant</span>`;
+  return `${tag}Enemy ${pos}, about ${m}&nbsp;m, ${lvl}, ${asp}.`;
+}
+
+// ---------- Overhead map ----------
+const ch = document.getElementById("chart"), chx = ch.getContext("2d");
+function drawChart() {
+  const { p1, p2 } = S, CW = ch.width;
+  const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2, sc = CW / 14;
+  chx.fillStyle = "#e4e9e8"; chx.fillRect(0, 0, CW, CW);
+  chx.strokeStyle = "#c3cdcf"; chx.lineWidth = 1;
+  for (let i = -8; i <= 8; i++) { const g = (Math.floor(mx) + i - mx) * sc + CW / 2; chx.beginPath(); chx.moveTo(g, 0); chx.lineTo(g, CW); chx.stroke(); const h = (Math.floor(my) + i - my) * sc + CW / 2; chx.beginPath(); chx.moveTo(0, h); chx.lineTo(CW, h); chx.stroke(); }
+  const plot = (p, color, trail) => {
+    chx.strokeStyle = color; chx.globalAlpha = .4; chx.lineWidth = 2; chx.beginPath();
+    trail.forEach((t, i) => { const x = (t.x - mx) * sc + CW / 2, y = (t.y - my) * sc + CW / 2; i ? chx.lineTo(x, y) : chx.moveTo(x, y); }); chx.stroke(); chx.globalAlpha = 1;
+    const x = (p.x - mx) * sc + CW / 2, y = (p.y - my) * sc + CW / 2;
+    chx.save(); chx.translate(x, y); chx.rotate(p.h * 45 * DEG); chx.fillStyle = color;
+    chx.fillRect(-15, -4, 30, 7); chx.fillRect(-2.5, -12, 5, 26); chx.fillRect(-7, 10, 14, 4); chx.restore();
+    chx.fillStyle = "#1b2830"; chx.font = "600 12px 'IBM Plex Mono', monospace"; chx.textAlign = "left"; chx.fillText(`alt ${p.alt.toFixed(1)}`, x + 16, y - 10);
+    // firing cone
+    chx.fillStyle = color; chx.globalAlpha = .1; chx.beginPath(); chx.moveTo(x, y);
+    const a = p.h * 45 * DEG; chx.arc(x, y, 4.5 * sc, a - Math.PI / 2 - 15 * DEG, a - Math.PI / 2 + 15 * DEG); chx.fill(); chx.globalAlpha = 1;
+  };
+  plot(p1, "#2c5a86", S.trail1); plot(p2, "#b3342b", S.trail2);
+  chx.fillStyle = "#4b5c64"; chx.font = "12px 'IBM Plex Mono', monospace"; chx.textAlign = "right"; chx.fillText(`grid = ${UNIT_M} m`, CW - 8, CW - 8);
+}
+
+// ---------- Game state & UI ----------
+const $ = id => document.getElementById(id);
+const API = "/api/game";
+const SAVE_KEY = "paperaces.online";
+let S = null, pollTimer = null;
+
+const store = {
+  get() { try { return JSON.parse(localStorage.getItem(SAVE_KEY) || "null"); } catch (e) { return null; } },
+  set(v) { try { v ? localStorage.setItem(SAVE_KEY, JSON.stringify(v)) : localStorage.removeItem(SAVE_KEY); } catch (e) {} },
+};
+
+function names() {
+  if (S.mode === "hot") return ["Pilot 1", "Pilot 2"];
+  if (S.mode === "online") return S.seat === 1 ? ["You", "Opponent"] : ["Opponent", "You"];
+  return ["You", S.level >= 2 ? "The ace" : "The rookie"];
+}
+function seat() { return S.mode === "online" ? S.seat : S.mode === "hot" ? S.picking : 1; }
+function currentPick() { return S.mode === "online" ? S.myPick : S["pick" + S.picking]; }
+
+function showGame(rowNames) {
+  $("nm1").textContent = rowNames[0]; $("nm2").textContent = rowNames[1];
+  $("start").hidden = true; $("game").hidden = false;
+}
+function newGame(mode, level) {
+  stopPolling();
+  S = { ...P.newDuel(), mode, level, picking: 1, pick1: null, pick2: null, showChart: S ? S.showChart : false };
+  showGame(names());
+  if (mode === "hot") curtain("Pilot 1, take the controls", "Pilot 2, look away. Pilot 1 picks first.", () => render());
+  else render();
+}
+
+function hpBar(el, hp) { el.innerHTML = ""; for (let i = 0; i < MAX_HP; i++) { const b = document.createElement("i"); if (i >= hp) b.className = "lost"; el.appendChild(b); } }
+function buildMans() {
+  const box = $("mans"); box.innerHTML = "";
+  for (const id of ORDER) {
+    const b = document.createElement("button");
+    b.className = "man"; b.id = "man-" + id; b.dataset.m = id; b.type = "button";
+    b.innerHTML = glyph(id) + `<span>${MAN[id].name}</span>`;
+    b.addEventListener("click", () => choose(id));
+    box.appendChild(b);
+  }
+}
+function choose(id) {
+  if (S.mode === "online") { if (S.myPick || !S.joined || S.over) return; S.draft = id; }
+  else S["pick" + S.picking] = id;
+  render();
+}
+function glyph(id) {
+  const st = `stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"`;
+  const paths = {
+    straight: `<path d="M19 33V8M13 14l6-6 6 6"/>`,
+    slow: `<path d="M19 33V18M13 24l6-6 6 6"/><path d="M12 31h14" stroke-dasharray="2 3"/>`,
+    fast: `<path d="M19 35V4M13 10l6-6 6 6M13 17l6-6 6 6"/>`,
+    bankL: `<path d="M24 33V22q0-9-10-12M14 4l-2 6 6 2"/>`,
+    bankR: `<path d="M14 33V22q0-9 10-12M24 4l2 6-6 2"/>`,
+    hardL: `<path d="M26 34V18q0-6-6-6H8M13 7l-5 5 5 5"/>`,
+    hardR: `<path d="M12 34V18q0-6 6-6h12M25 7l5 5-5 5"/>`,
+    slipL: `<path d="M22 33l-8-23M10 13l4-4 4 4"/><path d="M22 33V14" stroke-dasharray="2 3"/>`,
+    slipR: `<path d="M16 33l8-23M20 13l4-4 4 4"/><path d="M16 33V14" stroke-dasharray="2 3"/>`,
+    immel: `<path d="M14 34V12a6 6 0 0 1 12 0v12M21 19l5 6 5-6"/>`,
+  };
+  return `<svg viewBox="0 0 38 38" aria-hidden="true"><g ${st}>${paths[id]}</g></svg>`;
+}
+
+function render() {
+  const nm = names(), me2 = seat() === 2;
+  const me = me2 ? S.p2 : S.p1, en = me2 ? S.p1 : S.p2;
+  const fx = (me2 ? S.fx2 : S.fx1) || {};
+  const { rel, rear } = drawPage(me, en, fx);
+  $("pno").textContent = String(pageNumber(me, en)).padStart(3, "0");
+  $("who").textContent = `${S.mode === "online" ? (me2 ? "Red" : "Blue") + " (you)" : nm[me2 ? 1 : 0]} · ${rear ? "looking aft" : "forward view"}`;
+  $("caption").innerHTML = describe(me, en, rel, rear);
+  hpBar($("hp1"), Math.max(S.p1.hp, 0)); hpBar($("hp2"), Math.max(S.p2.hp, 0));
+  $("alt1").textContent = `${Math.round(S.p1.alt * 150 + 600)} m`; $("alt2").textContent = `${Math.round(S.p2.alt * 150 + 600)} m`;
+  $("turnno").textContent = `Turn ${S.turn}`;
+
+  const online = S.mode === "online";
+  const pick = online ? (S.myPick || S.draft) : currentPick();
+  const frozen = S.over || (online && (!!S.myPick || !S.joined));
+  $("pickhead").textContent = S.mode === "hot" ? `${nm[S.picking - 1]}'s maneuver` : "Your maneuver";
+  $("pickwho").innerHTML = online ? `Code <b class="code">${S.code}</b>` : "";
+  for (const id of ORDER) {
+    const b = $("man-" + id), why = lockReason(me.last, id);
+    b.disabled = !!why || frozen; b.classList.toggle("sel", pick === id);
+    b.title = why ? `${MAN[id].long}: ${why}` : MAN[id].long;
+  }
+  const locked = [...new Set(ORDER.map(id => lockReason(me.last, id)).filter(Boolean))];
+  let note = locked.length ? `Locked this turn: ${locked.join(" ")}` : "Pick a maneuver. Struck-through cards are locked by your last move.";
+  if (pick) note = `${MAN[pick].long}.${pick === "immel" ? " You climb and reverse direction; no dive or second Immelmann next turn." : ""}`;
+  const go = $("go");
+  go.disabled = !pick; go.textContent = "Fly it";
+  if (online) {
+    const oppSeat = S.seat === 1 ? 2 : 1, oppPicked = S.picked && S.picked[oppSeat];
+    if (!S.joined) { note = `Waiting for an opponent. Share the code ${S.code}.`; go.disabled = true; go.textContent = "Waiting for opponent"; }
+    else if (S.myPick) { note = `${MAN[S.myPick].long}. Locked in.`; go.disabled = true; go.textContent = "Waiting for their move"; }
+    else if (oppPicked) note = `Your opponent has chosen. ${pick ? MAN[pick].long + "." : "Your move."}`;
+    if (S.busy) go.disabled = true;
+  }
+  if (S.over) { note = S.overText; go.disabled = false; go.textContent = "Fly again"; }
+  if (S.error) note = S.error;
+  $("note").textContent = note;
+  $("log").innerHTML = S.log.map(l => `<p class="${l.hit ? "hit" : ""}"><b>T${l.n}</b>${escapeHtml(l.t)}</p>`).join("");
+  $("chart").hidden = !S.showChart; if (S.showChart) drawChart();
+}
+function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+function curtain(title, text, cb, btn = "I'm ready", extra = "") {
+  $("ct-title").textContent = title; $("ct-text").textContent = text; $("ct-btn").textContent = btn;
+  $("ct-extra").innerHTML = extra;
+  $("curtain").hidden = false;
+  $("ct-btn").onclick = () => { $("curtain").hidden = true; cb && cb(); };
+  $("ct-btn").focus();
+}
+function endCurtain() {
+  const nm = names();
+  let title;
+  if (S.mode === "online") title = S.winner === 0 ? "Mutual loss" : S.winner === S.seat ? "Victory" : "Shot down";
+  else if (S.mode === "ai") title = S.winner === 0 ? "Mutual loss" : S.winner === 1 ? "Victory" : "Shot down";
+  else title = S.winner === 0 ? "Mutual loss" : `${nm[S.winner - 1]} wins`;
+  curtain(title, `${S.overText} The duel lasted ${S.turn - 1} turns.`, () => {}, "See the last page");
+}
+
+function fly() {
+  if (S.over) { if (S.mode === "online") return rematch(); return newGame(S.mode, S.level); }
+  if (S.mode === "online") return sendPick();
+  if (S.mode === "hot" && S.picking === 1) {
+    S.picking = 2;
+    curtain("Pilot 2, take the controls", "Pilot 1 has chosen. Pilot 1, look away.", () => render());
+    return;
+  }
+  if (S.mode === "ai") S.pick2 = P.aiChoose(S.p2, S.p1, S.level);
+  P.resolveTurn(S, S.pick1, S.pick2, names());
+  S.pick1 = S.pick2 = null; S.picking = 1;
+  render();
+  if (S.over) { setTimeout(endCurtain, 900); return; }
+  if (S.mode === "hot") curtain("Pilot 1, take the controls", "Both moves are flown. Pilot 2, look away.", () => render());
+}
+
+// ---------- Online play ----------
+async function api(body) {
+  let r;
+  try { r = await fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); }
+  catch (e) { throw new Error("Can't reach the game server. Check your connection."); }
+  let data = null; try { data = await r.json(); } catch (e) {}
+  if (!r.ok || !data) throw Object.assign(new Error((data && data.error) || (r.status === 404 && !data ? "Online play needs the Vercel deployment with its /api folder." : "Server error " + r.status)), { status: r.status });
+  return data;
+}
+function onlineMsg(t) { $("onlinemsg").textContent = t || ""; }
+
+function applyState(st) {
+  const prevTurn = S && S.mode === "online" ? S.turn : null, wasOver = S && S.over, wasJoined = S && S.joined;
+  const keep = S && S.mode === "online" ? { showChart: S.showChart, draft: S.draft } : { showChart: false };
+  S = { ...keep, ...st, mode: "online", error: null, busy: false };
+  if (prevTurn !== null && st.turn !== prevTurn) S.draft = null;
+  if (S.myPick) S.draft = null;
+  showGame(S.seat === 1 ? ["You", "Red"] : ["Blue", "You"]);
+  render();
+  if (S.joined && !wasJoined && !$("curtain").hidden) $("curtain").hidden = true;
+  if (!S.joined && !wasJoined && $("curtain").hidden) hostCurtain();
+  if (S.over && !wasOver && prevTurn !== null) setTimeout(endCurtain, 900);
+}
+function hostCurtain() {
+  const link = location.origin + location.pathname + "#" + S.code;
+  curtain("Game " + S.code, "Your opponent opens Paper Aces on their device, chooses Join and enters this code. You fly Blue.", () => leaveOnline(), "Cancel game",
+    `<div class="bigcode" aria-label="Game code">${S.code}</div><p class="share">Or send them this link:<br><span class="link" id="sharelink">${escapeHtml(link)}</span></p><button class="ghost" id="copylink" type="button">Copy link</button><p class="waiting">Waiting for a second pilot…</p>`);
+  $("copylink").onclick = () => {
+    const done = () => { $("copylink").textContent = "Copied"; };
+    if (navigator.clipboard) navigator.clipboard.writeText(link).then(done, () => selectText($("sharelink"))); else selectText($("sharelink"));
+  };
+}
+function selectText(el) { const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+
+async function hostGame() {
+  onlineMsg("Opening a new game…"); $("host").disabled = true;
+  try {
+    const { token, state } = await api({ action: "create" });
+    store.set({ code: state.code, token });
+    onlineMsg(""); S = null; applyState({ ...state, token });
+    startPolling();
+  } catch (e) { onlineMsg(e.message); }
+  finally { $("host").disabled = false; }
+}
+async function joinGame(code, token) {
+  code = String(code || "").toUpperCase().replace(/[^A-Z]/g, "");
+  if (code.length !== 4) { onlineMsg("Enter the four-letter code from the host."); return; }
+  onlineMsg("Joining " + code + "…");
+  try {
+    const res = await api({ action: "join", code, token });
+    store.set({ code, token: res.token });
+    onlineMsg(""); S = null; applyState({ ...res.state, token: res.token });
+    if (!S.joined && S.seat === 1) hostCurtain();
+    startPolling();
+  } catch (e) { onlineMsg(e.message); if (e.status === 404 || e.status === 403) { const s = store.get(); if (s && s.code === code) store.set(null); refreshRejoin(); } }
+}
+async function sendPick() {
+  const m = S.draft; if (!m) return;
+  S.busy = true; render();
+  try { const { state } = await api({ action: "pick", code: S.code, token: S.token, turn: S.turn, maneuver: m }); applyState({ ...state, token: S.token }); }
+  catch (e) { S.busy = false; S.error = e.message; render(); if (e.status === 409) poll(); }
+}
+async function rematch() {
+  try { const { state } = await api({ action: "rematch", code: S.code, token: S.token }); applyState({ ...state, token: S.token }); }
+  catch (e) { S.error = e.message; render(); poll(); }
+}
+async function poll() {
+  if (!S || S.mode !== "online" || $("game").hidden) return;
+  try { const { state } = await api({ action: "state", code: S.code, token: S.token }); applyState({ ...state, token: S.token }); }
+  catch (e) { if (e.status === 404) { S.error = "This game has expired."; store.set(null); render(); stopPolling(); return; } }
+}
+function startPolling() {
+  stopPolling();
+  const tick = async () => {
+    await poll();
+    if (!S || S.mode !== "online") return;
+    const waiting = !S.joined || !!S.myPick;
+    const delay = document.hidden ? 8000 : waiting ? 1500 : 3000;
+    pollTimer = setTimeout(tick, delay);
+  };
+  pollTimer = setTimeout(tick, 1500);
+}
+function stopPolling() { if (pollTimer) clearTimeout(pollTimer); pollTimer = null; }
+function leaveOnline() { stopPolling(); store.set(null); $("game").hidden = true; $("start").hidden = false; refreshRejoin(); }
+function refreshRejoin() {
+  const s = store.get(), b = $("rejoin");
+  b.hidden = !s; if (s) b.textContent = `Rejoin game ${s.code}`;
+}
+
+buildMans();
+document.querySelectorAll(".mode").forEach(b => b.addEventListener("click", () => newGame(b.dataset.mode, +b.dataset.level || 0)));
+$("go").addEventListener("click", fly);
+$("quit").addEventListener("click", () => { if (S && S.mode === "online") { stopPolling(); } $("curtain").hidden = true; $("game").hidden = true; $("start").hidden = false; refreshRejoin(); });
+$("chartbtn").addEventListener("click", e => { S.showChart = !S.showChart; e.currentTarget.setAttribute("aria-pressed", S.showChart); render(); });
+$("host").addEventListener("click", hostGame);
+$("joinform").addEventListener("submit", e => { e.preventDefault(); joinGame($("joincode").value); });
+$("joincode").addEventListener("input", e => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4); });
+$("rejoin").addEventListener("click", () => { const s = store.get(); if (s) joinGame(s.code, s.token); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden && S && S.mode === "online") poll(); });
+document.addEventListener("keydown", e => {
+  if (!S || $("game").hidden || !$("curtain").hidden || e.target.tagName === "INPUT") return;
+  const k = "qwertasdfg".indexOf(e.key.toLowerCase());
+  if (k >= 0) { const id = ORDER[k]; if (!$("man-" + id).disabled) choose(id); }
+  if (e.key === "Enter" && !$("go").disabled) fly();
+});
+refreshRejoin();
+const hashCode = (location.hash || "").replace("#", "").toUpperCase();
+if (/^[A-Z]{4}$/.test(hashCode)) { $("joincode").value = hashCode; onlineMsg(`Ready to join game ${hashCode}. Press Join.`); }
+})();
+</script>
+</body>
+</html>
