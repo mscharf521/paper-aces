@@ -1,32 +1,66 @@
 # Paper Aces
 
-A two-pilot WWI dogfight played one page at a time, inspired by the picture-book dogfight games of the early 1980s. All artwork is drawn live in the browser; no book scans are used.
+A two-pilot WWI dogfight played one cockpit page at a time. Both pilots pick a maneuver in secret; then each turns to the page that shows what they see. All artwork is drawn live in the browser.
 
-## Play
-- **Versus a rookie / an ace** — fight a computer pilot.
-- **Two pilots, one screen** — pass-and-play; a curtain hides each pilot's choice.
-- **Fly online** — one player presses **Host a game** and gets a four-letter code (and a share link). The other player types the code and presses **Join**. The host flies Blue, the joiner flies Red. Moves stay secret on the server until both are in, then the server flies the turn. A player who reloads can press **Rejoin game**. Either player can call a rematch when the duel ends.
+Modes: versus a rookie or an ace (computer), same-screen pass-and-play, and **online** play between two devices using a four-letter code.
 
-Keyboard: `Q W E R T` / `A S D F G` select the ten maneuvers, `Enter` flies.
+## Stack
+- **Vite + React 19 + TypeScript**, routed with React Router
+- **Vercel Function** at `api/game.ts` (Web-standard `POST` handler)
+- **Upstash Redis** via `@upstash/redis` for online game state
 
-## Deploy to Vercel
-No build step and no npm packages.
+```
+api/game.ts              POST /api/game — thin HTTP wrapper
+server/gameService.ts    create / join / state / pick / rematch / leave
+server/redis.ts          Upstash client; finds the env vars Vercel added
+shared/rules.ts          flight rules + computer pilot (used by client AND server)
+shared/online.ts         API types, code format
+src/main.tsx             router
+src/routes/              Home, LocalGame, OnlineHub, OnlineGame (lobby + match), HowToPlay
+src/components/          CockpitPage, ManeuverPicker, Panels, GameScreen, Overlay
+src/render/              canvas drawing for the cockpit page and overhead map
+src/hooks/useOnlineGame  polling + actions for an online match
+src/lib/                 API client, saved-game tokens, captions
+```
 
-1. Push this folder to a GitHub repo and import it in Vercel (Framework Preset: **Other**, no build command), or run `vercel --prod` inside the folder.
-2. Online play needs the Upstash Redis integration on the project. The API reads either `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` or `KV_REST_API_URL` + `KV_REST_API_TOKEN` (including names with a custom prefix such as `STORAGE_KV_REST_API_URL`). Redeploy after connecting the database so the function picks up the variables.
+## Routes
+| Path | Screen |
+|---|---|
+| `/` | Mode select |
+| `/play/rookie`, `/play/ace`, `/play/local` | Offline duels |
+| `/online` | Host a game, or join with a code |
+| `/g/ABCD` | Lobby while waiting, then the match. Opening this link on a new device offers to join as Red. |
+| `/how-to-play` | Rules |
 
-## How online play is stored
+## Online flow
+1. **Host a game** → server creates a code and a secret token, saves both in Redis, and the host lands on `/g/CODE`, which shows the code and waits.
+2. The other player enters the code (or opens the invite link) → server atomically claims the second seat and hands back a token.
+3. The host's lobby notices within ~1.5 s and switches to the match.
+4. Each turn, picks are stored hidden. When both are in, exactly one request resolves the turn (Redis lock) and both clients see the new page on their next poll.
+
+Tokens live in `localStorage`, so a reload or rejoin from `/online` keeps your seat. Games expire 3 hours after the last move.
+
+## Deploy on Vercel
+1. Push this folder to GitHub and import it in Vercel (it detects Vite; build `npm run build`, output `dist`).
+2. Make sure the Upstash Redis integration is connected to the project. The server accepts `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`, or `KV_REST_API_URL` + `KV_REST_API_TOKEN`, including versions with a custom prefix.
+3. Redeploy after connecting the database so the function sees the variables.
+
+If online play says *"The game server has no database"*, the function can't see those variables: check they're enabled for the Production environment and redeploy.
+
+## Run locally
+```bash
+npm install
+cp .env.example .env.local   # paste your Upstash REST URL and token
+npm run dev                  # http://localhost:5173 — /api runs inside Vite
+```
+`npm run build` type-checks and builds.
+
+## Redis keys
 | Key | Holds | Expires |
 |---|---|---|
-| `pa:g:CODE` | Game state: positions, damage, log, and the two players' secret tokens | 3 h after last write |
-| `pa:p:CODE` | This turn's hidden picks (`turn:seat` → maneuver) | 3 h |
-| `pa:j:CODE` | Claim on the second seat, so only one person can join | 3 h |
-| `pa:l:CODE:TURN` | Short lock so only one request resolves a turn | 20 s |
+| `pa:g:CODE` | game record: duel state + both players' tokens | 3 h after last write |
+| `pa:p:CODE` | hidden picks, field `turn:seat` | 3 h |
+| `pa:j:CODE` | claim on the second seat | 3 h |
+| `pa:l:CODE:TURN` | lock so one request resolves each turn | 20 s |
 
-Clients poll `/api/game` every 1.5 s while waiting and every 3 s otherwise (8 s in a background tab). Each poll is one Upstash request with two commands. A 20-minute game uses roughly 2,000–3,000 commands, well inside Upstash's free daily allowance for casual play.
-
-## Files
-- `index.html` — page, cockpit renderer, local modes, online client.
-- `rules.js` — flight rules and computer pilot, shared by the browser and the API.
-- `api/game.js` — Vercel function: create, join, state, pick, rematch.
-- `vercel.json` — clean URLs, no stale caching.
+Polling is 1.5 s while waiting and 3 s otherwise (8 s in a background tab); each poll is one Upstash request with two commands. A 30-turn game used about 680 commands in testing.
