@@ -1,5 +1,6 @@
 import { Redis } from "@upstash/redis";
-import { HttpError } from "./errors";
+import { HttpError } from "./errors.js";
+import { memoryRedis } from "./memoryRedis.js";
 
 let client: Redis | null = null;
 
@@ -24,6 +25,12 @@ export function redis(): Redis {
   if (client) return client;
   const creds = resolveCredentials();
   if (!creds) {
+    if (!process.env.VERCEL) {
+      // Local dev without Upstash: keep games in this process's memory.
+      console.warn("[paper-aces] No Upstash credentials found; using an in-memory store. Games reset when the dev server restarts.");
+      client = memoryRedis();
+      return client;
+    }
     throw new HttpError(500, "The game server has no database. Connect Upstash Redis to the Vercel project and redeploy.");
   }
   client = new Redis({ url: creds.url, token: creds.token });

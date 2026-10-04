@@ -2,6 +2,7 @@
   "name": "paper-aces",
   "private": true,
   "version": "2.0.0",
+  "type": "module",
   "description": "A two-pilot WWI dogfight played one cockpit page at a time.",
   "scripts": {
     "dev": "vite",

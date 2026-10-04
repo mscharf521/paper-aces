@@ -1,5 +1,5 @@
 // Types for the online API, shared by the client and the server.
-import type { Duel, ManeuverId, Seat } from "./rules";
+import type { Duel, ManeuverId, Seat } from "./rules.js";
 
 export const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I or O, so codes read cleanly aloud
 export const normalizeCode = (s: unknown) => String(s ?? "").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
