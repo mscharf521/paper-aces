@@ -1,6 +1,6 @@
 // Vercel Function: POST /api/game
-import { handleAction } from "../server/gameService";
-import { HttpError } from "../server/errors";
+import { handleAction } from "../server/gameService.js";
+import { HttpError } from "../server/errors.js";
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {

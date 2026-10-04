@@ -13,6 +13,7 @@ Modes: versus a rookie or an ace (computer), same-screen pass-and-play, and **on
 api/game.ts              POST /api/game — thin HTTP wrapper
 server/gameService.ts    create / join / state / pick / rematch / leave
 server/redis.ts          Upstash client; finds the env vars Vercel added
+server/memoryRedis.ts    in-memory stand-in used by `npm run dev` when no Upstash vars are set
 shared/rules.ts          flight rules + computer pilot (used by client AND server)
 shared/online.ts         API types, code format
 src/main.tsx             router
@@ -50,9 +51,11 @@ If online play says *"The game server has no database"*, the function can't see 
 ## Run locally
 ```bash
 npm install
-cp .env.example .env.local   # paste your Upstash REST URL and token
 npm run dev                  # http://localhost:5173 — /api runs inside Vite
 ```
+With no Upstash variables set, the dev server keeps games in memory (they reset when it restarts). To use a real database locally, `cp .env.example .env.local` and paste your Upstash REST URL and token.
+
+The package is `"type": "module"`, so relative imports under `api/`, `server/` and `shared/` need a `.js` extension (e.g. `"./errors.js"`) for the Vercel function to load.
 `npm run build` type-checks and builds.
 
 ## Redis keys

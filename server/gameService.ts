@@ -5,10 +5,10 @@
 //   pa:j:CODE         claim on the second seat, so only one person can join
 //   pa:l:CODE:TURN    short lock so exactly one request resolves each turn
 import { randomBytes, randomInt } from "node:crypto";
-import { isManeuver, lockReason, newDuel, resolveTurn, type Duel, type ManeuverId, type Seat } from "../shared/rules";
-import { CODE_LETTERS, isCode, normalizeCode, type ApiRequest, type ApiResponse, type OnlineView } from "../shared/online";
-import { HttpError } from "./errors";
-import { redis } from "./redis";
+import { isManeuver, lockReason, newDuel, resolveTurn, type Duel, type ManeuverId, type Seat } from "../shared/rules.js";
+import { CODE_LETTERS, isCode, normalizeCode, type ApiRequest, type ApiResponse, type OnlineView } from "../shared/online.js";
+import { HttpError } from "./errors.js";
+import { redis } from "./redis.js";
 
 const TTL = 60 * 60 * 3; // seconds; refreshed on every write
 const NAMES: [string, string] = ["Blue", "Red"];
